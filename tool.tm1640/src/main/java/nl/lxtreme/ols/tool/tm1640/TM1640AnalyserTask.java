@@ -23,7 +23,6 @@ package nl.lxtreme.ols.tool.tm1640;
 
 import static nl.lxtreme.ols.util.NumberUtils.*;
 
-import java.beans.*;
 import java.util.logging.*;
 
 import nl.lxtreme.ols.api.acquisition.*;
@@ -42,6 +41,7 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
   private static final String CHANNEL_CLK_NAME = "CLK";
   private static final String CHANNEL_DIN_NAME = "DIN";
 
+  @SuppressWarnings("unused")
   private static final Logger LOG = Logger.getLogger( TM1640AnalyserTask.class.getName() );
 
   // VARIABLES
@@ -49,7 +49,6 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
   private final ToolContext context;
   private final ToolProgressListener progressListener;
   private final AnnotationListener annotationListener;
-  private final PropertyChangeSupport pcs;
 
   private int dinIdx;
   private int clkIdx;
@@ -68,22 +67,9 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
     this.context = aContext;
     this.progressListener = aProgressListener;
     this.annotationListener = aAnnotationListener;
-
-    this.pcs = new PropertyChangeSupport( this );
   }
 
   // METHODS
-
-  /**
-   * Adds the given property change listener.
-   * 
-   * @param aListener
-   *          the listener to add, cannot be <code>null</code>.
-   */
-  public void addPropertyChangeListener( final PropertyChangeListener aListener )
-  {
-    this.pcs.addPropertyChangeListener( aListener );
-  }
 
   /**
    * This is the TM1640 protocol decoder core The decoder scans for a decode start
@@ -101,32 +87,26 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
     final long[] timestamps = data.getTimestamps();
 
     // process the captured data and write to output
-    int oldCLK, oldDIN, bitCount;
+    boolean oldCLK, oldDIN;
+    int bitCount;
     int byteValue;
 
     int startOfDecode = this.context.getStartSampleIndex();
     int endOfDecode = this.context.getEndSampleIndex();
 
-    final int dinMask = ( 1 << this.dinIdx );
     final int clkMask = ( 1 << this.clkIdx );
+    final int dinMask = ( 1 << this.dinIdx );
 
     final TM1640DataSet tm1640DataSet = new TM1640DataSet( startOfDecode, endOfDecode, data );
 
     // Prepare everything for the decoding results...
     prepareResults();
 
-    /*
-     * Now decode the bytes, SDA may only change when SCL is low. Otherwise it
-     * may be a repeated start condition or stop condition. If the start/stop
-     * condition is not at a byte boundary a bus error is detected. So we have
-     * to scan for SCL rises and for SDA changes during SCL is high. Each byte
-     * is followed by a 9th bit (ACK/NACK).
-     */
     int idx = tm1640DataSet.getStartOfDecode();
     int prevIdx = -1;
 
-    oldCLK = values[idx] & clkMask;
-    oldDIN = values[idx] & dinMask;
+    oldCLK = (values[idx] & clkMask) == clkMask;
+    oldDIN = (values[idx] & dinMask) == dinMask;
 
     bitCount = 0;
     byteValue = 0;
@@ -137,24 +117,27 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
     {
       final int dataValue = values[idx];
 
-      final int din = ( dataValue & dinMask );
-      final int clk = ( dataValue & clkMask );
+      final boolean clk = ( dataValue & clkMask ) == clkMask;
+      final boolean din = ( dataValue & dinMask ) == dinMask;
 
-      if (clk == clkMask && oldDIN == dinMask && din == 0) {
+      if (clk && oldDIN && !din) {
+    	  // START: CLK high, falling edge on DIN.
     	  tm1640DataSet.reportStartCondition(  this.dinIdx, idx );
     	  running = true;
 		  byteValue = 0;
 		  bitCount = 0;
      }
 
-      if (clk == clkMask && oldDIN == 0 && din == dinMask) {
+      if (clk && !oldDIN && din) {
+    	  // STOP: CLK high, rising edge on DIN.
     	  tm1640DataSet.reportStopCondition(  this.dinIdx, idx );
     	  running = false;
       }
       
       if (running) {
-    	  if (oldCLK == 0 && clk == clkMask) {
-    		  byteValue = (byteValue >> 1) | (din == dinMask ? 0x80 : 0);
+    	  if (!oldCLK && clk) {
+    		  // BIT: Rising edge on CLK.
+    		  byteValue = (byteValue >> 1) | (din ? 0x80 : 0);
     		  if (bitCount == 0) {
     			  prevIdx = idx;
     		  }
@@ -162,7 +145,7 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
     	  }
     	  if (bitCount == 8) {
     		  tm1640DataSet.reportData(this.dinIdx, prevIdx, idx, byteValue);
-    		  String annotation = String.format( "0x%02X %s", byteValue, TM1640DataSet.decodeSegments(byteValue));
+    		  final String annotation = String.format( "0x%02X %s", byteValue, TM1640DataSet.decodeSegments(byteValue));
         	  this.annotationListener.onAnnotation( new SampleDataAnnotation( this.dinIdx, timestamps[prevIdx],
         			  timestamps[idx], annotation ) );
     		  byteValue = 0;
@@ -180,19 +163,8 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
     return tm1640DataSet;
   }
 
-/**
-   * Removes the given property change listener.
-   * 
-   * @param aListener
-   *          the listener to remove, cannot be <code>null</code>.
-   */
-  public void removePropertyChangeListener( final PropertyChangeListener aListener )
-  {
-    this.pcs.removePropertyChangeListener( aListener );
-  }
-
   /**
-   * @param aLineAmask
+   * @param clkIdx
    */
   public void setClkIndex( final int clkIdx )
   {
@@ -200,7 +172,7 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
   }
 
   /**
-   * @param aLineBmask
+   * @param dinIdx
    */
   public void setDinIndex( final int dinIdx )
   {
@@ -237,95 +209,3 @@ public class TM1640AnalyserTask implements ToolTask<TM1640DataSet>
   }
 
 }
-
-/* EOF */
-/*
-// detect SCL fall/rise
-if ( oldCLK > clk )
-{
-  // SCL falls
-  if ( ( prevIdx < 0 ) || ( bitCount == TM1640_BITCOUNT ) )
-  {
-    prevIdx = idx;
-  }
-
-  if ( bitCount == 0 )
-  {
-    // store decoded byte
-    tm1640DataSet.reportData( this.dinIdx, prevIdx, idx, byteValue );
-
-    final String annotation;
-    if ( startCondFound )
-    {
-      annotation = String.format( "%s data: 0x%X (%c)", "Write",
-          Integer.valueOf( byteValue ), Integer.valueOf( byteValue ) );
-    } else {
-  	  annotation = "OOOPS";
-    }
-
-    this.annotationListener.onAnnotation( new SampleDataAnnotation( this.dinIdx, timestamps[prevIdx],
-        timestamps[idx], annotation ) );
-
-    byteValue = 0;
-  }
-}
-else if ( clk > oldCLK )
-{
-  // SCL rises
-  if ( din != oldDIN )
-  {
-  }
-  else
-  {
-    // read SDA
-    if ( bitCount != 0 )
-    {
-      bitCount--;
-      if ( din != 0 )
-      {
-        byteValue |= ( 1 << bitCount );
-      }
-    }
-    else
-    {
-      // next byte
-      bitCount = TM1640_BITCOUNT;
-      byteValue = 0;
-    }
-  }
-}
-
-// detect SDA change when SCL high
-if ( ( din == dinMask ) && ( din != oldDIN ) )
-{
-  // SDA changes here
-  if ( ( bitCount > 0 ) && ( bitCount < ( TM1640_BITCOUNT - 1 ) ) )
-  {
-    // bus error, no complete byte detected
-  }
-  else
-  {
-    if ( din > oldDIN )
-    {
-      // SDA rises, this is a stop condition
-
-      this.annotationListener.onAnnotation( new SampleDataAnnotation( this.dinIdx, timestamps[idx],
-          TM1640DataSet.TM1640_STOP ) );
-
-    }
-    else
-    {
-      // SDA falls, this is a start condition
-
-      this.annotationListener.onAnnotation( new SampleDataAnnotation( this.dinIdx, timestamps[idx],
-          TM1640DataSet.TM1640_START ) );
-
-      startCondFound = true;
-    }
-
-    // new byte
-    bitCount = TM1640_BITCOUNT;
-    byteValue = 0;
-  }
-}
-*/

@@ -81,7 +81,7 @@ public class TM1640AnalyserWorkerDataFilesTest
     return Arrays.asList( new Object[][] { //
         // { resource name, CLK, DIN, datagramCount }
             { "tm1640_eight_dot.ols", 6, 7, 100 },	// 0
-            { "tm1640_isc.ols", 6, 7, 239 },		// 1
+            { "tm1640_isc.ols", 6, 7, 121 },		// 1
         } );
   }
 

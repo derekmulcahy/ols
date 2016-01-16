@@ -20,14 +20,11 @@
  */
 package nl.lxtreme.ols.tool.tm1640;
 
-
 import static nl.lxtreme.ols.util.ExportUtils.HtmlExporter.*;
 import static nl.lxtreme.ols.util.StringUtils.*;
 import static nl.lxtreme.ols.util.swing.SwingComponentUtils.*;
 
 import java.awt.*;
-import java.awt.event.*;
-import java.beans.*;
 import java.io.*;
 import java.text.*;
 import java.util.*;
@@ -51,21 +48,22 @@ import nl.lxtreme.ols.util.swing.*;
 
 import org.osgi.framework.*;
 
-
 /**
  * Provides a main dialog for the TM1640 analyser.
  *
  * @author Frank Kunz
  * @author J.W. Janssen
  */
-public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640DataSet> implements ExportAware<TM1640DataSet>,
-    PropertyChangeListener
+public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640DataSet> implements ExportAware<TM1640DataSet>
 {
   // CONSTANTS
 
   private static final long serialVersionUID = 1L;
 
   private static final Logger LOG = Logger.getLogger( TM1640ProtocolAnalysisDialog.class.getName() );
+  
+  private static final int DEFAULT_CLK_CHANNEL = 6;
+  private static final int DEFAULT_DIN_CHANNEL = 7;
 
   // VARIABLES
 
@@ -121,17 +119,6 @@ public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640Dat
   }
 
   /**
-   * {@inheritDoc}
-   */
-  @SuppressWarnings("unused")
-  @Override
-  public void propertyChange( final PropertyChangeEvent aEvent )
-  {
-    final String propertyName = aEvent.getPropertyName();
-    final Object lineValue = aEvent.getNewValue();
-  }
-
-  /**
    * @see nl.lxtreme.ols.api.Configurable#readPreferences(nl.lxtreme.ols.api.UserSettings)
    */
   public void readPreferences( final UserSettings aSettings )
@@ -179,8 +166,8 @@ public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640Dat
    */
   public void writePreferences( final UserSettings aSettings )
   {
-    aSettings.putInt( "lineA", this.clk.getSelectedIndex() );
-    aSettings.putInt( "lineB", this.din.getSelectedIndex() );
+    aSettings.putInt( "clk", this.clk.getSelectedIndex() );
+    aSettings.putInt( "din", this.din.getSelectedIndex() );
   }
 
   /**
@@ -238,9 +225,6 @@ public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640Dat
 
     toolTask.setClkIndex( this.clk.getSelectedIndex() );
     toolTask.setDinIndex( this.din.getSelectedIndex() );
-
-    // Register ourselves as property change listener...
-    toolTask.addPropertyChangeListener( this );
   }
 
   /**
@@ -328,11 +312,11 @@ public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640Dat
     this.dinLabel = createRightAlignedLabel( "DIN" );
 
     panel.add( this.clkLabel );
-    this.clk = SwingComponentUtils.createChannelSelector( channelCount, 6 );
+    this.clk = SwingComponentUtils.createChannelSelector( channelCount, DEFAULT_CLK_CHANNEL );
     panel.add( this.clk );
 
     panel.add( this.dinLabel );
-    this.din = SwingComponentUtils.createChannelSelector( channelCount, 7 );
+    this.din = SwingComponentUtils.createChannelSelector( channelCount, DEFAULT_DIN_CHANNEL );
     panel.add( this.din );
 
     SpringLayoutUtils.makeEditorGrid( panel, 10, 4 );
@@ -358,7 +342,7 @@ public final class TM1640ProtocolAnalysisDialog extends BaseToolDialog<TM1640Dat
           final DateFormat df = DateFormat.getDateInstance( DateFormat.LONG );
           return df.format( new Date() );
         }
-        else if ( "decoded-bytes".equals( aMacro ) || "detected-bus-errors".equals( aMacro ) )
+        else if ( "decoded-bytes".equals( aMacro ) )
         {
           return "-";
         }
