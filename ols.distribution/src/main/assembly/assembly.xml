@@ -49,6 +49,7 @@
 				<include>nl.lxtreme.ols.tool:asm45</include>
 				<include>nl.lxtreme.ols.tool:base</include>
 				<include>nl.lxtreme.ols.tool:i2c</include>
+				<include>nl.lxtreme.ols.tool:tm1640</include>
 				<include>nl.lxtreme.ols.tool:jtag</include>
 				<include>nl.lxtreme.ols.tool:spi</include>
 				<include>nl.lxtreme.ols.tool:state</include>

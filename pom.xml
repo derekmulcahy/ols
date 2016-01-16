@@ -54,6 +54,7 @@
 		<module>tool.1wire</module>
 		<module>tool.asm45</module>
 		<module>tool.i2c</module>
+		<module>tool.tm1640</module>
 		<module>tool.jtag</module>
 		<module>tool.spi</module>
 		<module>tool.state</module>
@@ -301,6 +302,11 @@
 			<dependency>
 				<groupId>nl.lxtreme.ols.tool</groupId>
 				<artifactId>i2c</artifactId>
+				<version>1.0.1</version>
+			</dependency>
+			<dependency>
+				<groupId>nl.lxtreme.ols.tool</groupId>
+				<artifactId>tm1640</artifactId>
 				<version>1.0.1</version>
 			</dependency>
 			<dependency>
